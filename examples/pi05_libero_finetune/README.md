@@ -42,11 +42,19 @@ lerobot は **v0.4.4** に固定している。0.5.0 以降は Python 3.12 以�
 
 ## 2. データセット
 
-LIBERO と LIBERO-plus を 20Hz で統合したデータセットを使う。場所は env で指定する。
+LIBERO と LIBERO-plus を 20Hz で統合したデータセットを使う。演習環境では
+`~/dataset/` に tar で配布しているので、先にルートの
+[scripts/extract_dataset.sh](../../scripts/extract_dataset.sh) で `~/data/` に展開する。
+
+```bash
+bash ../../scripts/extract_dataset.sh lerobot/libero_combined_20hz.tar
+```
+
+場所は env で指定する。
 
 ```bash
 export PI05_DATASET_REPO_ID=/path/to/hf/libero_combined_20hz
-export PI05_DATASET_ROOT=~/dataset/libero_combined_20hz
+export PI05_DATASET_ROOT=~/data/libero_combined_20hz
 ```
 
 ## 3. 学習

@@ -60,6 +60,20 @@ docker run -it --rm --gpus all -v ~/data:/data parc2026
 - コンテナは root で動作するため、`/data` に書いたファイルはホスト側で root 所有になる。
   必要なら `sudo chown -R $USER:$USER ~/data/<対象>` で戻すこと
 
+#### 学習データセットの展開
+
+使用するデータセットの tar を
+[scripts/extract_dataset.sh](scripts/extract_dataset.sh)（ホスト側で実行）で
+`~/dataset/` から `~/data/` 以下に展開してから学習に使用すること。
+
+```bash
+bash scripts/extract_dataset.sh                                   # 展開できる tar の一覧を表示
+bash scripts/extract_dataset.sh lerobot/libero_combined_20hz.tar  # 指定した tar を ~/data/ に展開
+```
+
+ホームディレクトリの容量には限りがあるため、必要なデータセットのみ展開し、
+不要になったデータは削除すること。
+
 ### 自身の GPU マシンで使う
 
 ```bash
@@ -312,6 +326,7 @@ python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
 | [evaluate.py](evaluate.py) | 提出 zip の一括評価 |
 | [validate_submission.py](validate_submission.py) | 提出物チェックスクリプト |
 | [examples/](examples/) | 学習の参考例（SmolVLA の Colab ノートブック / pi0.5 の追加学習レシピ）。提出には必須ではない |
+| [scripts/](scripts/) | 補助スクリプト（演習環境での学習データセット展開） |
 | [tests/](tests/) | ハーネスの単体テスト |
 | [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) | setup.sh が取得する第三者製ソフトのライセンス表記 |
 
