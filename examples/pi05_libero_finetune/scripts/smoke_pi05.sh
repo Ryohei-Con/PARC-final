@@ -126,9 +126,10 @@ cat <<EOF
 
 === smoke 完了 ===
 
-提出物としての確認は、評価用の環境（ルートの setup.sh + env.sh）で行うこと。
-学習用 venv では採点環境の依存を再現できない。
+マージ済みチェックポイント: ${MERGED:-<SMOKE_SKIP_MERGE のためなし>}
 
-  cp -r "${MERGED:-<マージ済みチェックポイント>}" submission/model_weights
-  python ../../validate_submission.py submission
+提出物にまとめる手順はこのレシピでは扱わない。採点環境で実際に動作した構成が
+サンプル提出物 pi05_step005000_submission_py310.zip として配布されているので、
+そちらを参照すること。提出物としての確認は評価用の環境（ルートの setup.sh +
+env.sh）で行うこと。学習用 venv では採点環境の依存を再現できない。
 EOF

@@ -1,7 +1,9 @@
 # pi0.5 の追加学習（LoRA）
 
-lerobot の pi0.5 を LIBERO 系データで LoRA 追加学習し、提出用のポリシー
-サーバーに組み込むまでのレシピ。
+lerobot の pi0.5 を LIBERO 系データで LoRA 追加学習し、提出用のチェックポイントを
+作るまでのレシピ。提出物（ポリシーサーバー）の作り方はこのレシピでは扱わない。
+採点環境で実際に動作したサンプル提出物 `pi05_step005000_submission_py310.zip` を
+参照すること。
 
 学習は GPU 必須で、下表の条件では 1 GPU で数十時間かかる。手元の GPU に
 合わせて `PI05_BS` / `PI05_GA` / `PI05_STEPS` を調整すること。
@@ -17,7 +19,6 @@ lerobot の pi0.5 を LIBERO 系データで LoRA 追加学習し、提出用の
 | [scripts/_train_common.sh](scripts/_train_common.sh) | ランチャー共通のヘルパー（resume、VRAM サンプラ等） |
 | [scripts/merge_lora.py](scripts/merge_lora.py) | LoRA をベース重みへマージして提出用チェックポイントを作る |
 | [patches/](patches/) | lerobot に当てる 2 本のパッチ（[下記](#パッチ)） |
-| [submission/](submission/) | 提出用のポリシーサーバーと `requirements.txt` |
 
 ## 1. 環境構築
 
@@ -36,9 +37,10 @@ export HF_TOKEN=hf_...        # gated repo の取得に必須
 採点環境の再現が目的なので、学習の依存で汚さないこと。評価と提出前チェックは
 ルートの `setup.sh` + `env.sh` 側で行う。
 
-lerobot は **v0.4.4** に固定している。0.5.0 以降は Python 3.12 以上を要求し、
-採点イメージの Python 3.10 には入らない。学習と推論で版がずれると、学習した
-チェックポイントを提出サーバーでロードできなくなるため、双方を 0.4.4 に揃えている。
+lerobot は **学習側で v0.4.4** に固定している。0.5.0 以降は Python 3.12 以上を要求し、
+採点イメージの Python 3.10 にはそのままでは入らない。提出側でどの版を使うかは別問題
+であり、このレシピでは決めない（0.4.4 で学習したチェックポイントを別版で配信すること
+自体はできる。サンプル提出物がその構成である）。
 
 ## 2. データセット
 
@@ -97,26 +99,29 @@ W&B に記録する（プロジェクト名は `WANDB_PROJECT`）。
 ```bash
 python scripts/merge_lora.py \
     --adapter ~/pi05-ft-outputs/<RUN_NAME>/checkpoints/020000/pretrained_model \
-    --out     submission/model_weights
+    --out     ~/pi05-ft-outputs/<RUN_NAME>/merged
 ```
 
-採点環境は外部通信を遮断するため、重みは zip に同梱する必要がある
+採点環境は外部通信を遮断するため、重みもトークナイザも zip に同梱する必要がある。
+`merge_lora.py` はトークナイザ（`google/paligemma-3b-pt-224`）を `<out>/tokenizer/`
+に出力する。gated repo であり、実行時には取得できないためである。
+
+ここから先――`policy_server.py` の実装、`requirements.txt`、zip の作り方――は
+**このレシピでは扱わない**。pi0.5 を採点環境で動かすには lerobot と transformers の
+版の組み合わせに固有の注意が要り、レシピ側に固定の手順を置くと実態とずれるためである。
+採点環境で実際に動作した構成がサンプル提出物として配布されているので、そちらを
+参照すること。
+
+    pi05_step005000_submission_py310.zip
+
+zip の構成要件（`policy_server.py` / `requirements.txt` / `model_weights/` の 3 点）と
+提出前チェックの手順はテンプレート側にまとまっている
 （[submission_template/README.md](../../submission_template/README.md)）。
-
-```bash
-cd submission
-zip -r ../submission.zip policy_server.py requirements.txt model_weights/
-cd ..
-python ../../validate_submission.py submission.zip     # 提出前チェック
-```
-
-`submission/policy_server.py` は
-[submission_template/policy_server.py](../../submission_template/policy_server.py) の
-`MyPolicy` だけを pi0.5 に差し替えたもので、変更不可の部分はテンプレートと一致している。
 
 ## 採点条件との対応
 
-学習・推論の設定は採点側に合わせてある。変更する場合はここがずれないよう注意する。
+学習の設定は採点側に合わせてある。提出側に関わる欄はサンプル提出物の構成である。
+変更する場合はここがずれないよう注意する。
 
 | 項目 | 採点環境 | 本例 |
 |---|---|---|
@@ -125,7 +130,7 @@ python ../../validate_submission.py submission.zip     # 提出前チェック
 | 1 エピソードの上限 | 300 ステップ | — |
 | 推論タイムアウト | 1 リクエスト 10 秒 | action chunk 10 ステップ分を 1 回で推論 |
 | サーバー起動 | 120 秒以内 | — |
-| Python | 3.10 | lerobot 0.4.4（3.10 対応の最終版） |
+| Python | 3.10 | 学習は lerobot 0.4.4（3.10 対応の最終版）。提出側の版はサンプル提出物を参照 |
 
 ## パッチ
 
@@ -136,29 +141,8 @@ python ../../validate_submission.py submission.zip     # 提出前チェック
 | `pi05-config-defaults.patch` | `PI05Config` に `drop_n_last_frames=49` を追加する。lerobot は policy config にこの属性があるときだけ `EpisodeAwareSampler` を使うため（`lerobot_train.py`）、無いと各エピソード末尾の 49 フレームが、エピソード外に出た action をパディング（最終 action の繰り返し）した状態で学習に入る。pi0.5 の損失は `action_is_pad` を見ない |
 | `grad-accum-env-var.patch` | `LEROBOT_GRAD_ACCUM` で勾配累積を有効にする（lerobot の CLI が公開していないため）。LR スケジューラも実効ステップごとに進むよう直す |
 
-`merge_lora.py` はこのキーを出力から取り除く。提出側の lerobot はパッチ未適用の
-ため、残すとロードに失敗する。
-
-## 提出側の transformers について
-
-lerobot 0.4.4 の pi0.5 は transformers の fork
-（`git+https://github.com/huggingface/transformers@fix/lerobot_openpi`）を前提に
-している。学習環境はこれをそのまま入れるが、提出物の `requirements.txt` に git 依存は
-書けないため、提出側は素の `transformers==4.53.2` を入れ、fork との差分を
-`submission/policy_server.py` の `_install_transformers_shim()` で補う。
-
-fork と素の 4.53.x の差は次の 2 点だけである。
-
-| | 内容 |
-|---|---|
-| `transformers.models.siglip.check` | バージョン文字列を確認するだけのモジュール。無いと lerobot が `ValueError: An incorrect transformer version is used` を出す |
-| siglip の bfloat16 キャスト | encoder が bfloat16 のとき embeddings の出力をキャストする 3 行。シムでは `SiglipEncoder.forward` の入口で同じキャストを行う |
-
-lerobot 0.5.0 以降はこの前提自体が撤去されている。
-
-`merge_lora.py` はトークナイザ（`google/paligemma-3b-pt-224`）も
-`model_weights/tokenizer/` に同梱する。採点環境は外部通信を遮断しており、かつ
-gated repo なので、実行時には取得できない。
+`merge_lora.py` はこのキーを出力から取り除く。パッチを当てていない lerobot では
+このキーがあるとロードに失敗するため、マージ済みチェックポイントには残さない。
 
 ## ライセンス
 

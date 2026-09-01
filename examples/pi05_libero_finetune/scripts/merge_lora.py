@@ -3,7 +3,7 @@
 
     python scripts/merge_lora.py \
         --adapter ~/pi05-ft-outputs/<RUN_NAME>/checkpoints/020000/pretrained_model \
-        --out     submission/model_weights
+        --out     ~/pi05-ft-outputs/<RUN_NAME>/merged
 
 patches/pi05-config-defaults.patch が追加する学習専用の設定キーは出力から
 取り除く。残すと、パッチを当てていない lerobot でのロードが失敗する。
