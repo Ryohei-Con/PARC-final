@@ -99,6 +99,41 @@ LIBERO の MIT License が及ぶ。
 （pi0.5 が PaliGemma / Gemma を基盤とするため）。Gemma のライセンスには利用禁止事項
 （Gemma Prohibited Use Policy）および再配布時の条件が定められている。
 
+### InternVLA-A1.5 追加学習レシピ（[examples/internvla_a15_libero_finetune/](examples/internvla_a15_libero_finetune/)）
+
+| ソフトウェア／重み | 取得元 | ライセンス |
+|---|---|---|
+| InternVLA-A-series（コード） | https://github.com/InternRobotics/InternVLA-A-series | Apache-2.0 |
+| InternVLA-A1.5 ベース重み | https://huggingface.co/InternRobotics/InternVLA-A1.5 | **CC BY-NC-SA 4.0**（非商用・下記の注意を参照） |
+| Qwen3.5-2B（VLM バックボーン） | https://huggingface.co/Qwen | Apache-2.0（配布元の表記を確認すること） |
+| Wan2.2（動画補助タスクの DiT / VAE） | https://github.com/Wan-Video/Wan2.2 | Apache-2.0 |
+| FAST action tokenizer | https://huggingface.co/physical-intelligence/fast | Apache-2.0 |
+| transformers / accelerate / diffusers | PyPI | Apache-2.0 |
+| safetensors | PyPI | Apache-2.0 |
+| draccus | PyPI | MIT License |
+
+このレシピは上流 `InternVLA-A-series` を**書き換えない**。`lerobot_policy_parc/` は
+上流の公開 API（`register_subclass` / `load_schemas_from_path`）だけを使う独立した
+追加コードであり、上流の派生物ではない。ただし提出物には上流の `src/lerobot` を
+そのまま同梱するため、その部分には上流の Apache-2.0 が及ぶ。
+
+### InternVLA-A1.5 ベース重みのライセンスに関する注意
+
+`InternRobotics/InternVLA-A1.5` の重みは **CC BY-NC-SA 4.0** で提供される。
+コード（Apache-2.0）とはライセンスが異なる点に注意すること。CC BY-NC-SA 4.0 は
+
+- **非商用利用に限る**（NonCommercial）
+- 表示（Attribution）が必要
+- 改変物を頒布する場合は**同一ライセンスで継承**する（ShareAlike）
+
+ことを求める。追加学習した重みは原重みの派生物にあたるため、再配布する場合は
+同じ条件が及ぶ。コンペへの提出を超えて利用・公開する場合は、配布元の最新の表記と
+条文を必ず確認すること。
+
+Wan2.2 の重みはコードと別に条件が付く場合がある。動画補助タスク（`action_loss_only=false`）
+を使う場合は配布元の表記を確認すること。学習後のチェックポイントには WAN の重みは
+含まれない（上流の `state_dict()` が `model.wan_video_model.*` を除外するため）。
+
 ---
 
 各ライセンスの全文は、`setup.sh` 実行後に取得された各パッケージ／リポジトリの

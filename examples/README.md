@@ -4,6 +4,7 @@
 |---|---|
 | [smolvla_libero_spatial_lora.ipynb](smolvla_libero_spatial_lora.ipynb) | SmolVLA を LIBERO-plus Spatial で LoRA 追加学習する Google Colab ノートブック |
 | [pi05_libero_finetune/](pi05_libero_finetune/) | pi0.5 を LIBERO 系データで LoRA 追加学習し、提出物にするまでのレシピ |
+| [internvla_a15_libero_finetune/](internvla_a15_libero_finetune/) | InternVLA-A1.5 を LIBERO 系データでフルファインチューニングし、Python 3.10 の採点環境向けに提出物を組むまでのレシピ |
 
 規模が異なるので、目的に応じて選ぶこと。
 
@@ -74,3 +75,25 @@ LoRA のマージ、提出サーバーを含む。
 - 学習が出力するのは LoRA アダプタなので、`scripts/merge_lora.py` でベース重みへ
   マージしてから提出物に同梱する（採点環境は外部通信を遮断するため）。
 - ベース重みは Gemma Terms of Use で提供される。[THIRD_PARTY_LICENSES.md](../THIRD_PARTY_LICENSES.md) を参照。
+
+## internvla_a15_libero_finetune/
+
+[InternVLA-A1.5](https://github.com/InternRobotics/InternVLA-A-series) を
+`libero_combined_20hz` でフルファインチューニングし、Python 3.10 の採点環境で
+動く提出物を組むまで一式。overlay パッケージ、チャンク境界の平滑化、提出物の
+生成・検証スクリプト、手元（GPU 不要）で回る単体テストを含む。
+
+手順とハイパーパラメータは
+[internvla_a15_libero_finetune/README.md](internvla_a15_libero_finetune/README.md)
+を参照。要点は次のとおり。
+
+- **上流リポジトリを 1 バイトも書き換えない（overlay 方式）。** 上流には
+  `lerobot_policy_*` を自動 import する plugin 機構があり、transform・dataset
+  config・robot schema の登録がすべて公開 API で足りる。パッチを当てないので、
+  提出物に同梱する `vendor/lerobot` を上流とバイト一致に保てる。
+- **学習 256 / 採点 128 の解像度差を学習側で潰す。** 256→128 のダウンサンプルを
+  挟み、カーネル（box / triangle / cubic / nearest）をランダムに振って頑健にする。
+- **推論経路のリサイズを明示的に入れる。** 上流の推論バックエンドはリサイズが
+  no-op になっており、学習 224 に対し推論が生解像度のまま VLM に入る。エラーは
+  出ないまま精度だけ落ちるので、自前ランタイムでは学習と同一の関数を無条件で通す。
+- ベース重みは CC BY-NC-SA 4.0（非商用）で提供される。[THIRD_PARTY_LICENSES.md](../THIRD_PARTY_LICENSES.md) を参照。

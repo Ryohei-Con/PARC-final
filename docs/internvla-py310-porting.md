@@ -480,6 +480,7 @@ python -m pipeline --server-url http://localhost:8000 --track track1 --n-episode
 | 症状 | 原因 | 検出方法 |
 |---|---|---|
 | 学習は進むが精度が出ない | torchcodec の ABI 不一致で動画デコードが例外 → ゼロ埋め画像 | デコード結果を 1 枚保存して目視 |
+| 学習では効くのに評価だけ精度が出ない | 推論バックエンドの `ResizeImagesWithPadFn` が hydrate されておらず `mapping` が空で no-op。学習 224 に対し推論が生解像度のまま Qwen processor に入り `image_grid_thw` が食い違う | 学習経路と推論経路で `image_grid_thw` を突き合わせる |
 | 行動が微妙におかしい | `from_pretrained(strict=False)` で一部がランダム初期化のまま | `assert_checkpoint_covers_model()` |
 | 精度が出ない | 別の `lerobot` が先に import されている | `print(Path(lerobot.__file__).parent)` |
 | 起動が 120 秒に間に合わない | `resize_token_embeddings` の `mean_resizing=True` | ロード時間を計測して印字 |

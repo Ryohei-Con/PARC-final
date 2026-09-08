@@ -1,0 +1,34 @@
+# PARC 2026 overlay schema: `libero_combined`
+#
+# 上流 `src/lerobot/dataset_schemas/configs/libero.yaml` の 1 エントリを、
+# robot_type だけ `libero_combined` に変えたもの。上流ファイルは編集しない
+# （計画 §3 / §4.2: overlay 方針）。
+#
+# 上流の libero レシピはスイート別（libero_10 / libero_goal / libero_object /
+# libero_spatial）に robot_type を振り、launch script が info.json を書き換えて
+# いた。本レシピは統合データセット `libero_combined_20hz` を 1 本の robot_type
+# として扱うため、この方向を意図的に反転させる（計画 P3-19）。
+#
+# 以下は上流 libero.yaml からそのまま引き継ぐ:
+#   - feature_mapping / image_mapping
+#   - action_mask_spec: [6, -1]（先頭 6 次元が delta、末尾 1 次元が絶対値の
+#     二値グリッパ。学習は action_mode="abs" なので DeltaActionTransformFn は
+#     走らないが、正しさのために残す）
+#   - action_mode: end_effector
+#
+# action_reorder / state_reorder は **書かない**（計画 F9）。libero schema は
+# 元々これらを持たず、グリッパは index 6 のまま。RTC guidance の除外次元
+# （runtime_config.json の chunking.exclude_dims=[6]）はこの事実に依存する。
+
+- robot_type: libero_combined
+  feature_mapping:
+    observation.state:
+      - observation.state
+    action:
+      - action
+  image_mapping:
+    observation.images.image: observation.images.image0
+    observation.images.wrist_image: observation.images.image1
+  action_mask_spec: [6, -1]
+  action_mode: end_effector
+  description: "LIBERO combined 20Hz (agentview + wrist cameras, 7D EE delta + gripper)"

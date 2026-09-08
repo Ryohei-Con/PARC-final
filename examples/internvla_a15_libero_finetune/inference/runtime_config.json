@@ -1,0 +1,62 @@
+{
+  "_comment": [
+    "PARC 2026 提出物の推論設定。採点環境は環境変数を渡してくれないので、",
+    "設定はこのファイルに焼き込む（移植手順書 B8）。読み込みは os.environ.setdefault",
+    "なので、手元では環境変数を立てればこちらより優先される（A/B のたびに zip を",
+    "作り直さずに済む）。",
+    "",
+    "\"TBD\" の項目は P2（クラウドでのデータ確認）で確定する。TBD のまま推論を",
+    "起動しようとすると internvla_runtime.py が明示的に例外を投げる。既定値で",
+    "黙って動かすことはしない。"
+  ],
+
+  "runtime": "standard",
+
+  "env": {
+    "IVLA_ROBOT_TYPE": "libero_combined"
+  },
+
+  "image_orientation": {
+    "_comment": "P2-17 で dataset PNG と env PNG を照合して確定する。none|flip_ud|flip_lr|rot180",
+    "agentview": "TBD",
+    "wrist": "TBD"
+  },
+
+  "state": {
+    "source": "eef_pos+axisangle+gripper_qpos",
+    "dim": 8
+  },
+
+  "gripper": {
+    "_comment": [
+      "dataset_convention は P2-16 で stats.json の action dim6 の min/max/mean と",
+      "ヒストグラムから確定する。zero_one | minus_one_one。",
+      "below_threshold は「しきい値未満のとき env にどちらを出すか」。",
+      "既定 close は計画 §P5-29 の既定規則 action[6] = +1 if a < 0.5 else -1 に対応する。"
+    ],
+    "dataset_convention": "TBD",
+    "binarize": true,
+    "threshold": null,
+    "below_threshold": "close",
+    "env_close": 1.0,
+    "env_open": -1.0
+  },
+
+  "chunking": {
+    "_comment": "mode: none | rtc | ensemble。replan_steps と w_max は P7-37 の A/B で確定する。",
+    "mode": "rtc",
+    "replan_steps": 16,
+    "w_max": 0.8,
+    "schedule": "linear",
+    "exclude_dims": [6],
+    "ensemble_m": 0.1
+  },
+
+  "resize": {
+    "_comment": "F6 対策。推論側でも学習と同じ lerobot.transforms.utils.resize_with_pad を通す。",
+    "height": 224,
+    "width": 224
+  },
+
+  "num_inference_steps": 10
+}

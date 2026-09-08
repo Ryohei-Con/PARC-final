@@ -1,0 +1,52 @@
+# PARC 2026 提出物の requirements（初版 / P1-12）
+#
+# validate_submission.py の禁止事項（F14）:
+#   オプション -i / --index-url / -f / --find-links / -e / -r / -c は使えない。
+#   git: / https: / file: 等のスキームも不可。**PyPI のピン留めだけ**を書く。
+#
+# torch は採点環境（torch 2.11.0+cu130）に合わせて 2.11.0 に固定する。
+# 移植手順書 B3 の 2.10.0 は別環境向けの値なのでそのまま使わない。
+#
+# transformers は**完全固定**が必須（移植手順書 B3）。差し替え版
+# modeling_qwen3_5.py が transformers.utils.generic.is_flash_attention_requested の
+# ような内部 API を直接叩くため、マイナー版がずれるだけで起動時 ImportError になる。
+# 実際に通る版は P7-C2（クリーン venv での総当り）で確定する。
+#
+# vendor した lerobot が import する依存（推論では使わないが import されるもの）を
+# 漏れなく書く必要がある。ここも P7-C2 のループで潰す。
+
+# ---- コア ----
+torch==2.11.0
+torchvision==0.26.0
+transformers==5.2.0
+accelerate>=1.10.0,<2.0.0
+safetensors>=0.4.5
+
+# ---- 提出サーバー（テンプレートが import する）----
+fastapi>=0.115.0,<1.0.0
+uvicorn>=0.30.0,<1.0.0
+msgpack>=1.0.8
+
+# ---- vendor lerobot が import 時に引くもの ----
+# NOTE: 推論では実際には使わないが、import チェーン上に居るので必要。
+draccus>=0.10.0
+numpy>=1.26,<3.0
+pyyaml>=6.0
+packaging>=23.0
+huggingface-hub>=0.30.0
+datasets>=4.0.0,<4.2.0
+pandas>=2.0.0
+pyarrow>=15.0.0
+av>=12.0.0
+deepdiff>=7.0.0
+jsonlines>=4.0.0
+einops>=0.8.0
+imageio>=2.34.0
+
+# ---- InternVLA-A1.5 の WAN 分岐（action_loss_only=False の checkpoint 用）----
+# 推論時は WAN を構築しないが、import は走る。
+diffusers>=0.27.2,<0.36.0
+
+# ---- 任意（あると速い。無くても動く）----
+# flash-linear-attention は Gated DeltaNet の高速経路。無いと純 torch 実装になり
+# 推論が数倍遅くなる（移植手順書 §6）。採点環境で入るかは P7-C2 で確認する。
