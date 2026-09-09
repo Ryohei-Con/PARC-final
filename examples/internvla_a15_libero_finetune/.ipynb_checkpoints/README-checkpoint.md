@@ -1,11 +1,5 @@
 # InternVLA-A1.5 の追加学習（フルファインチューニング）
 
-> **学習と評価を実際に回す手順は [TRAINING.md](TRAINING.md) にまとめてある。**
-> 環境構築（`scripts/setup_train.sh`）、データ投入（`scripts/provision_data.sh`）、
-> smoke / probe / 本走（tmux）、提出物のエクスポートと評価まで通しで書いてある。
-> この機体で踏んだ環境固有の落とし穴（cuBLASLt / cu128 / エフェメラル領域 / flash-attn 必須）も
-> そちらの §1.1 に表でまとめてある。
-
 [InternVLA-A1.5](https://github.com/InternRobotics/InternVLA-A-series) を
 `libero_combined_20hz` でフルファインチューニングし、PARC 2026 の 3 トラックで
 動く単一ポリシーを作るためのレシピ。

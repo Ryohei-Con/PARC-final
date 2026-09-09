@@ -10,32 +10,27 @@
 
 # 上流リポジトリ（InternVLA-A-series）。**読み取り専用で使う。**
 # このレシピは overlay 方式で、上流を 1 バイトも書き換えない。
-export IVLA_REPO="${HOME}/InternVLA-A-series"
+export IVLA_REPO="/home/ryokondo/InternVLA-A-series"
 
 # 学習用 conda env（評価用 venv とは別に作る）
 export IVLA_CONDA_ENV="internvla_a1_5"
 
-# データセット（scripts/provision_data.sh が展開する）。
-# **${HOME}/data は再起動のたびに空になる**（エフェメラル領域）。消えたら
-#   bash scripts/provision_data.sh
-# で入れ直す。repo_id は HF_LEROBOT_HOME からの相対で解決される
-# （lerobot/utils/constants.py:67, datasets/lerobot_dataset.py:681）。
-export IVLA_DATASET_ROOT="${HOME}/data/libero_combined_20hz"
-export IVLA_DATASET_REPO_ID="libero_combined_20hz"
+# データセット（scripts/extract_dataset.sh で展開したもの）
+#   bash ../../scripts/extract_dataset.sh lerobot/libero_combined_20hz.tar
+export IVLA_DATASET_ROOT="/home/ryokondo/data/libero_combined_20hz"
+export IVLA_DATASET_REPO_ID="${IVLA_DATASET_ROOT}"
 
-# 学習の出力先。**永続側（/home）に置く。**チェックポイントは消えては困る。
-export IVLA_OUTPUT_DIR="${HOME}/ivla-a15-outputs"
-export IVLA_LOG_ROOT="${HOME}/ivla-a15-logs"
+# 学習の出力先
+export IVLA_OUTPUT_DIR="/home/ryokondo/ivla-a15-outputs"
 export RUN_NAME="ivla_a15_libero_combined"
 
 # ベース重みと VLM
-export IVLA_PRETRAINED_PATH="${HOME}/data/hf/InternVLA-A1.5-base"
+export IVLA_PRETRAINED_PATH="/home/ryokondo/data/hf/InternVLA-A1.5-base"
 export IVLA_VLM_MODEL_PATH="Qwen/Qwen3.5-2B"
 
 # Hugging Face のキャッシュ。学習前にキャッシュしておき、本走は
 # HF_HUB_OFFLINE=1 で再現性を確認する（計画 R5）。
-# 重みも ${HOME}/data 側（エフェメラル）。消えたら provision_data.sh で入れ直す。
-export HF_HOME="${HOME}/data/hf"
+export HF_HOME="/home/ryokondo/data/hf"
 # export HF_HUB_OFFLINE=1
 # export TRANSFORMERS_OFFLINE=1
 
@@ -62,25 +57,11 @@ export IVLA_DECAY_LR=5e-6               # 上流どおり
 export IVLA_SAVE_FREQ=5000              # steps // 6 = 5,000（5〜6 個残る）
 export IVLA_LOG_FREQ=50                 # 単 GPU なので上流の 200 より細かく
 
-# **BS は probe（scripts/probe_ivla_bs.sh）後に確定する。**
-# 注意: 上流 lerobot_train.py の update_policy() は毎バッチ optimizer.step() する
-# （accelerator.accumulate() を使っていない）ため、**gradient accumulation は無い**。
-# 実効バッチ = batch_size である。IVLA_GRAD_ACCUM は存在しない。
+# 実効バッチ 32〜64 を狙う。**BS と grad accum は probe（P4-23）後に確定する。**
 export IVLA_BS=""
+export IVLA_GRAD_ACCUM=""
 export IVLA_NUM_WORKERS=8
 export IVLA_GRADIENT_CHECKPOINTING=false
-# 動画ヘッド。false = WAN 分岐 on（WAN の重みと flash-attn が必要）
-export IVLA_ACTION_LOSS_ONLY=false
-
-# ---------------------------------------------------------------------------
-# 3.1 バックボーン VLM の学習率倍率（ユーザー指定）
-# ---------------------------------------------------------------------------
-# model.qwen3_5_with_expert.qwen3_5.* （= Qwen3.5-2B 本体、視覚エンコーダ込み）だけ
-# lr を this 倍にする。他（action expert / 各種 projection）は IVLA_LR のまま。
-# overlay の lerobot_policy_parc/_monkeypatch.py が optimizer preset を差し替えて実現する。
-# 値は train_config.json に記録されるので、後から checkpoint で確認できる。
-# 1.0 にすると分割は残したまま上流と同じ挙動になる（A/B 用）。
-export IVLA_VLM_LR_SCALE=0.1
 
 # ---------------------------------------------------------------------------
 # 4. ダウンサンプル（RenderDownsampleFn）の確率
@@ -98,3 +79,24 @@ export IVLA_RENDER_P_NEAREST=0.10
 export WANDB_PROJECT="parc2026-ivla-a15"
 export WANDB_MODE="offline"
 # export WANDB_API_KEY=...
+
+# ---------------------------------------------------------------------------
+# 6. setup_train.sh が確定させた値（自動生成。手で編集せず setup_train.sh を再実行する）
+# ---------------------------------------------------------------------------
+# conda は毎回 source し直す。**bash script 内の conda activate はサブシェルにしか
+# 効かない**ので、後続スクリプトも _train_common.sh の _activate_conda を使うこと。
+source "/home/ryokondo/miniforge3/etc/profile.d/conda.sh"
+conda activate "internvla_a1_5"
+
+export IVLA_CONDA_ROOT="/home/ryokondo/miniforge3"
+export IVLA_LOG_ROOT="/home/ryokondo/ivla-a15-logs"
+export HF_LEROBOT_HOME="${HF_HOME}/lerobot"
+# 上流 launch script が $CONDA_PREFIX/lib を LD_LIBRARY_PATH に足しているのと同じ。
+# conda-forge の ffmpeg 共有ライブラリを torchcodec が dlopen できるようにする。
+export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH:-}"
+export PYTHONUNBUFFERED=1
+export TOKENIZERS_PARALLELISM=false
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+# 秘密情報は git 管理外の ~/.env から読む（このファイルには書かない）。
+[ -f "/home/ryokondo/.env" ] && source "/home/ryokondo/.env"

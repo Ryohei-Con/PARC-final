@@ -1,0 +1,181 @@
+{
+  "root": "/home/ryokondo/data/libero_combined_20hz",
+  "fps": 20,
+  "robot_type_before": "panda",
+  "robot_type_after": "libero_combined",
+  "total_episodes": 19533,
+  "total_frames": 3028708,
+  "image_features": {
+    "observation.images.wrist": {
+      "shape": [
+        256,
+        256,
+        3
+      ],
+      "names": [
+        "height",
+        "width",
+        "rgb"
+      ],
+      "dtype": "video"
+    },
+    "observation.images.front": {
+      "shape": [
+        256,
+        256,
+        3
+      ],
+      "names": [
+        "height",
+        "width",
+        "rgb"
+      ],
+      "dtype": "video"
+    }
+  },
+  "state_dim": 8,
+  "state_layout": [
+    "state_0",
+    "state_1",
+    "state_2",
+    "state_3",
+    "state_4",
+    "state_5",
+    "state_6",
+    "state_7"
+  ],
+  "action_dim": 7,
+  "gripper_convention": "minus_one_one",
+  "stats_keys": [
+    "action",
+    "episode_index",
+    "frame_index",
+    "index",
+    "observation.images.front",
+    "observation.images.wrist",
+    "observation.state",
+    "task_index",
+    "timestamp"
+  ],
+  "stats_num_keys": 9,
+  "normalization_mode_hint": "read from train_config.json after training starts (plan U7)",
+  "image_hw": [
+    [
+      256,
+      256
+    ]
+  ],
+  "action_stats": {
+    "min": [
+      -0.9375,
+      -0.9375,
+      -0.9375,
+      -0.3257142901420593,
+      -0.375,
+      -0.375,
+      -1.0
+    ],
+    "max": [
+      0.9375,
+      0.9375,
+      0.9375,
+      0.375,
+      0.375,
+      0.375,
+      1.0
+    ],
+    "mean": [
+      0.062394218993960665,
+      0.08134711241913006,
+      -0.091824392725025,
+      0.0011386421375639204,
+      0.004640851524886149,
+      -0.004940511434599408,
+      0.10997626733760797
+    ]
+  },
+  "gripper_dim6": {
+    "min": -1.0,
+    "max": 1.0,
+    "mean": 0.10997626733760797
+  },
+  "state_stats": {
+    "min": [
+      -0.4862295389175415,
+      -0.3970998525619507,
+      0.008128180168569088,
+      -0.7480751872062683,
+      -4.363129138946533,
+      -3.212415933609009,
+      -0.0025667562149465084,
+      -0.04255744442343712
+    ],
+    "max": [
+      0.21031762659549713,
+      0.48814651370048523,
+      1.3660105466842651,
+      4.843389987945557,
+      4.042375564575195,
+      2.4014885425567627,
+      0.04639676958322525,
+      0.0017311422852799296
+    ],
+    "mean": [
+      -0.050980503379854984,
+      0.031270517118100145,
+      0.7787382880000755,
+      2.987270509710026,
+      -0.14846734943793607,
+      -0.10441230640194399,
+      0.02673774287016865,
+      -0.027039162239736163
+    ]
+  },
+  "gripper_histogram": {
+    "n": 2000,
+    "min": -1.0,
+    "max": 1.0,
+    "mean": 0.09,
+    "most_common": [
+      [
+        1.0,
+        958
+      ],
+      [
+        -1.0,
+        778
+      ],
+      [
+        0.0,
+        264
+      ]
+    ]
+  },
+  "gripper_direction": {
+    "method": "同一エピソード内で action[6] を出した次ステップの指の開き幅 state[6]-state[7] の変化",
+    "source_file": "data/chunk-000/file-000.parquet (3,028,708 行 / 19,533 エピソード)",
+    "action_plus1": {
+      "n": 1486312,
+      "mean_delta_width": -0.00046,
+      "mean_width": 0.0443,
+      "meaning": "close"
+    },
+    "action_minus1": {
+      "n": 1145047,
+      "mean_delta_width": 0.0006,
+      "mean_width": 0.0736,
+      "meaning": "open"
+    },
+    "conclusion": "dataset は LIBERO env と同一規約（+1=閉 / -1=開）。env への変換は恒等。",
+    "runtime_config": {
+      "dataset_convention": "minus_one_one",
+      "threshold": 0.0,
+      "below_threshold": "open"
+    }
+  },
+  "image_orientation": {
+    "agentview": "TBD",
+    "wrist": "TBD",
+    "note": "採点 env の生フレームが要る（tools/dump_env_frames.py）。ルートの setup.sh で Python 3.10 評価 venv を作ってから実行する。**学習には影響しない**（推論のみ）。"
+  }
+}

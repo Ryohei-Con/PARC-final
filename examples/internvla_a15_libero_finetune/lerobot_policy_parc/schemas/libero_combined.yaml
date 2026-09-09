@@ -10,7 +10,7 @@
 # として扱うため、この方向を意図的に反転させる（計画 P3-19）。
 #
 # 以下は上流 libero.yaml からそのまま引き継ぐ:
-#   - feature_mapping / image_mapping
+#   - feature_mapping
 #   - action_mask_spec: [6, -1]（先頭 6 次元が delta、末尾 1 次元が絶対値の
 #     二値グリッパ。学習は action_mode="abs" なので DeltaActionTransformFn は
 #     走らないが、正しさのために残す）
@@ -26,9 +26,18 @@
       - observation.state
     action:
       - action
+  # image_mapping は {データセット側の feature 名: モデル側のキー}。**上流とは源キーが違う。**
+  # 上流 libero サブセットは observation.images.image / .wrist_image という名前だが、
+  # 本コンペの libero_combined_20hz は meta/info.json の features が
+  #   observation.images.front / observation.images.wrist
+  # である（P2 の事実収集で確認済み）。源キーが実データと一致しないと
+  # RemapImageKeyTransformFn（transforms/core.py:238）の `data.pop(old_key)` が
+  # KeyError になる（幸い黙って落ちるのではなく即例外になる）。
+  # front = 三人称カメラ（上流の agentview 相当）-> image0
+  # wrist = 手首カメラ                            -> image1
   image_mapping:
-    observation.images.image: observation.images.image0
-    observation.images.wrist_image: observation.images.image1
+    observation.images.front: observation.images.image0
+    observation.images.wrist: observation.images.image1
   action_mask_spec: [6, -1]
   action_mode: end_effector
-  description: "LIBERO combined 20Hz (agentview + wrist cameras, 7D EE delta + gripper)"
+  description: "LIBERO combined 20Hz (front + wrist cameras, 7D EE delta + gripper)"

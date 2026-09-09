@@ -29,15 +29,20 @@
 
   "gripper": {
     "_comment": [
-      "dataset_convention は P2-16 で stats.json の action dim6 の min/max/mean と",
-      "ヒストグラムから確定する。zero_one | minus_one_one。",
-      "below_threshold は「しきい値未満のとき env にどちらを出すか」。",
-      "既定 close は計画 §P5-29 の既定規則 action[6] = +1 if a < 0.5 else -1 に対応する。"
+      "P2-16 で確定済み（artifacts/facts/facts.json）。",
+      "action dim6 は {-1, 0, +1} の三値で min=-1 / max=+1 -> minus_one_one。",
+      "向きも実データで確認した: 同一エピソード内で action[6]=+1 を出した次ステップの",
+      "グリッパ指の開き幅 (state[6]-state[7]) が平均 -0.00046 変化（=閉じる、平均幅 0.0443）、",
+      "action[6]=-1 では +0.00060 変化（=開く、平均幅 0.0736）。n=1.49M / 1.15M。",
+      "つまりデータセットは LIBERO env と同一規約（+1=閉、-1=開）で、変換は恒等。",
+      "threshold=null -> minus_one_one では 0.0 が使われる。",
+      "below_threshold=\"open\" は「0 未満なら env_open(-1) を出す」= 恒等写像。",
+      "ここを \"close\" にすると開閉が反転し全タスク 0% になる（計画 U1）。"
     ],
-    "dataset_convention": "TBD",
+    "dataset_convention": "minus_one_one",
     "binarize": true,
     "threshold": null,
-    "below_threshold": "close",
+    "below_threshold": "open",
     "env_close": 1.0,
     "env_open": -1.0
   },

@@ -279,16 +279,24 @@ def test_shipped_runtime_config_is_loadable():
     assert config["num_inference_steps"] == 10
 
 
-def test_shipped_runtime_config_still_has_tbd_fields():
-    """P2 でデータを見るまで向きとグリッパ規約は TBD のままであること。
+def test_shipped_runtime_config_tbd_state_matches_p2_progress():
+    """出荷 config の TBD 状態が P2 の進捗と一致していること。
 
     埋まっていたら「誰かが推測で埋めた」ということなので、ここで気付けるようにする。
-    確定したらこのテストを SC-4 の完了と同時に更新する。
+    値を確定させたら**根拠と一緒に**このテストを更新する。
+
+    - ``gripper.dataset_convention``: **確定済み**。``artifacts/facts/facts.json`` の
+      ``gripper_direction`` に根拠がある（同一エピソード内で ``action[6]`` を出した次
+      ステップの指の開き幅の変化。+1 で閉じ、-1 で開く / n=1.49M・1.15M）。
+    - ``image_orientation``: **未確定**。採点 env の生フレームが要る（tools/dump_env_frames.py）。
+      学習には影響せず、推論のみに効く。
     """
     config = load_runtime_config(RUNTIME_CONFIG)
     assert config["image_orientation"]["agentview"] == "TBD"
     assert config["image_orientation"]["wrist"] == "TBD"
-    assert config["gripper"]["dataset_convention"] == "TBD"
+    assert config["gripper"]["dataset_convention"] == "minus_one_one"
+    # 向きは恒等（+1=閉 / -1=開）。ここを "close" にすると開閉が反転する（計画 U1）。
+    assert config["gripper"]["below_threshold"] == "open"
 
 
 def test_resolve_image_orientation_rejects_tbd():
@@ -298,9 +306,29 @@ def test_resolve_image_orientation_rejects_tbd():
 
 
 def test_resolve_gripper_rejects_tbd():
+    """``dataset_convention`` が TBD なら例外（既定値で黙って動かさない）。
+
+    出荷 config では確定済みなので、TBD に戻して番人が生きていることを確かめる。
+    """
     config = load_runtime_config(RUNTIME_CONFIG)
+    config["gripper"] = {**config["gripper"], "dataset_convention": "TBD"}
     with pytest.raises(ValueError, match="TBD"):
         resolve_gripper(config)
+
+
+def test_resolve_gripper_uses_dataset_convention_from_config():
+    """確定値がそのまま使われること（P2 の事実確定の反映）。
+
+    ``minus_one_one`` では threshold が 0.0 になり、``below_threshold="open"`` と
+    合わせて「モデル出力の符号をそのまま env に渡す」= 恒等写像になる。
+    """
+    config = load_runtime_config(RUNTIME_CONFIG)
+    gripper = resolve_gripper(config)
+    assert gripper["dataset_convention"] == "minus_one_one"
+    assert gripper["threshold"] == 0.0
+    assert gripper["below_threshold"] == "open"
+    assert gripper["env_close"] == 1.0
+    assert gripper["env_open"] == -1.0
 
 
 def test_resolve_image_orientation_accepts_resolved_values():

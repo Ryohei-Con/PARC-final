@@ -42,10 +42,16 @@ def main() -> None:
 
     summary = overlay.assert_installed()
 
+    # 学習経路でだけ必要な monkeypatch（バックボーン VLM の lr を 0.1 倍）。
+    # 当たっていなければここで例外。「0.1 倍したつもり」で本走するのを防ぐ。
+    patches = overlay.assert_training_patches()
+
     import lerobot
 
     logging.info("overlay=%s upstream=%s", overlay.__file__, lerobot.__file__)
     logging.info("overlay registrations: %s", summary["robot_types"])
+    logging.info("training patches: %s", patches["patches"])
+    logging.info("vlm_lr_scale=%s", patches["vlm_lr_scale"])
 
     from lerobot.scripts.lerobot_train import main as lerobot_main
 

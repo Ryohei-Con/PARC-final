@@ -7,6 +7,13 @@
 - ``RenderDownsampleFn`` を ``DataTransformFn.register_subclass`` で登録（F3）
 - ``InternVLAA15ParcDatasetConfig`` / ``InternVLAA15ParcVQADatasetConfig`` を
   ``DatasetConfig`` / ``VQADatasetConfig`` の choice registry へ登録
+- ``ParcAdamWVlmScaledConfig``（バックボーン VLM だけ lr を 0.1 倍）を
+  ``OptimizerConfig`` の choice registry へ登録
+
+学習時のみ、上流に届かない 2 点を :mod:`._monkeypatch` で差し替える。これは
+``install()`` ではなく **``install_training_patches()``** が行う（上流モデルの import が
+必要で重いため、登録だけしたい経路と分けてある）。主経路 ``scripts/train_entry.py`` は
+必ずこれを呼ぶ。
 
 パッケージ名を ``lerobot_policy_`` 始まりにしてあるので、上流の
 ``register_third_party_plugins()``（``utils/import_utils.py:133-155``、F1）でも
@@ -23,13 +30,16 @@ from __future__ import annotations
 
 import logging
 
-from . import _provenance
+from . import _monkeypatch, _provenance
 from .schema_bootstrap import PARC_ROBOT_TYPES, install_parc_schemas
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
     "PARC_ROBOT_TYPES",
+    "ParcAdamWVlmScaledConfig",
+    "assert_training_patches",
+    "install_training_patches",
     "RenderDownsampleFn",
     "InternVLAA15ParcDatasetConfig",
     "InternVLAA15ParcVQADatasetConfig",
@@ -41,6 +51,7 @@ __all__ = [
 #: choice registry へ登録する名前
 TRANSFORM_CHOICE = "render_downsample"
 DATASET_CHOICE = "internvla_a1_5_parc"
+OPTIMIZER_CHOICE = "parc_adamw_vlm_scaled"
 
 _INSTALLED = False
 
@@ -59,6 +70,7 @@ def install() -> None:
         InternVLAA15ParcDatasetConfig as _Robot,
         InternVLAA15ParcVQADatasetConfig as _VQA,
     )
+    from .optim_vlm_lr import ParcAdamWVlmScaledConfig as _Optim  # noqa: F401
 
     _provenance.check_provenance()
     _INSTALLED = True
@@ -70,7 +82,11 @@ def installed_summary() -> dict:
     from lerobot.dataset_schemas import get_registry
     from lerobot.transforms.core import DataTransformFn
 
+    from lerobot.optim.optimizers import OptimizerConfig
+
     return {
+        "optimizer_choices": sorted(OptimizerConfig.get_known_choices()),
+        "training_patches": _monkeypatch.applied(),
         "robot_types": [
             rt for rt in PARC_ROBOT_TYPES if rt in get_registry().list_available()
         ],
@@ -90,6 +106,7 @@ def assert_installed() -> dict:
 
     from lerobot.configs.default import DatasetConfig, VQADatasetConfig
     from lerobot.dataset_schemas import get_registry, get_schema
+    from lerobot.optim.optimizers import OptimizerConfig
     from lerobot.transforms.core import DataTransformFn
 
     problems: list[str] = []
@@ -113,12 +130,61 @@ def assert_installed() -> dict:
         problems.append(f"DatasetConfig choice '{DATASET_CHOICE}' not registered")
     if DATASET_CHOICE not in VQADatasetConfig.get_known_choices():
         problems.append(f"VQADatasetConfig choice '{DATASET_CHOICE}' not registered")
+    if OPTIMIZER_CHOICE not in OptimizerConfig.get_known_choices():
+        problems.append(f"OptimizerConfig choice '{OPTIMIZER_CHOICE}' not registered")
 
     if problems:
         raise RuntimeError("lerobot_policy_parc overlay is not installed: " + "; ".join(problems))
 
     summary = installed_summary()
     logger.info("lerobot_policy_parc overlay OK: %s", summary["robot_types"])
+    return summary
+
+
+def install_training_patches() -> list[str]:
+    """学習経路でだけ必要な monkeypatch を当てる（計画 §3 の例外規定）。
+
+    上流モデル（``modeling_internvla_a1_5``）の import が要るので、schema/transform の
+    登録だけをしたい経路（テスト等）と分けてある。:func:`install` には含めない。
+    """
+    install()
+    return _monkeypatch.apply()
+
+
+def assert_training_patches() -> dict:
+    """monkeypatch が本当に効いているかを**実照会**で検証する。
+
+    「VLM の学習率を 0.1 倍したつもり」で全パラメータが同じ lr のまま回る事故を、
+    学習を始める前にここで落とす。
+    """
+    applied = install_training_patches()
+
+    from lerobot.policies.internvla_a1_5.configuration_internvla_a1_5 import InternVLAA15Config
+
+    from .optim_vlm_lr import ParcAdamWVlmScaledConfig
+
+    problems: list[str] = []
+    if not applied:
+        problems.append("no monkeypatch applied")
+
+    # preset が実際に差し替わっているか（CLI の --optimizer.* は preset に上書きされる）
+    preset = InternVLAA15Config().get_optimizer_preset()
+    if not isinstance(preset, ParcAdamWVlmScaledConfig):
+        problems.append(
+            f"get_optimizer_preset() returned {type(preset).__name__}"
+            f"（{ParcAdamWVlmScaledConfig.__name__} のはず）"
+        )
+    elif preset.vlm_lr_scale >= 1.0:
+        logger.warning(
+            "vlm_lr_scale=%s（1.0 以上）。VLM の学習率は下がらない。%s を確認すること。",
+            preset.vlm_lr_scale, _monkeypatch.ENV_VLM_LR_SCALE,
+        )
+
+    if problems:
+        raise RuntimeError("lerobot_policy_parc training patches not applied: " + "; ".join(problems))
+
+    summary = {"patches": applied, "vlm_lr_scale": preset.vlm_lr_scale}
+    logger.info("lerobot_policy_parc training patches OK: %s", summary)
     return summary
 
 
@@ -140,4 +206,8 @@ def __getattr__(name: str):
         from . import dataset_config
 
         return getattr(dataset_config, name)
+    if name == "ParcAdamWVlmScaledConfig":
+        from .optim_vlm_lr import ParcAdamWVlmScaledConfig
+
+        return ParcAdamWVlmScaledConfig
     raise AttributeError(name)
