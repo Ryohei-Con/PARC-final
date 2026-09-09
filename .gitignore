@@ -9,3 +9,9 @@ LIBERO/
 assets.zip
 env_train.sh
 requirements-train.lock.txt
+.ipynb_checkpoints/
+.DS_Store
+*.log
+artifacts/probe/
+submission/
+*.zip
