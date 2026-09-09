@@ -528,3 +528,100 @@ cd ~/PARC2026_final && source env.sh
 5. **推論経路には必ず `resize_with_pad(224,224)` を通す**（上流の推論バックエンドはこれを省略している。計画 F6）。
 6. **`chunking["mode"]` を直接書き換えない。** `InternVLARuntime.set_chunking_mode()` を通す。
 7. `q01_q99` の逆正規化を独自に書き直さない。
+
+---
+
+## 9. VQA あり/なし比較
+
+ベースライン（VQA なし）を無改変で残したまま、RoboInter-VQA サブセットを混ぜた
+「VQA あり」run を **同一シード・同一 step・同一 chunking 設定**で回して比較する。
+実装計画は `docs/plans/internvla-a15-vqa-finetune-plan.md`。
+
+### 9.1 データ出所と代替理由
+
+- 公式 "example VQA data" は上流 README の TODO（`- [ ] Release the example VQA data ...`）で
+  **未公開**。そのため同組織のロボット領域 VQA データセット
+  **`InternRobotics/RoboInter-VQA`**（HF dataset）で代替する。
+- 由来は DROID / RH20T 等の実ロボット画像 + VQA アノテーション。全体は約 150GB あるので
+  **必ずサブセットのみ取得**する（`scripts/fetch_vqa_data.sh` がサイズガード付きで取得）。
+
+### 9.2 サブセット選定
+
+| 項目 | 値 |
+|---|---|
+| カテゴリ | `Understanding` + `Task_planning` の 2 つ（`Generation` は使わない） |
+| メタ形式 | `llava_format` のみ（`smart_resize_format` / `origin_format` は取得しない） |
+| サンプル数 | カテゴリ合計 `--max-samples 40000`（既定は均等割り 20000 / 20000） |
+| 画像前処理 | `prepare_vqa_data.py --pad-square`（既定 ON。短辺パディング → 256×256） |
+| 連結 | 2 カテゴリを `--merge-into all.jsonl` で 1 本に連結（`MultiVQADataset` は per-dataset
+  weight を持たないため）。`source` はカテゴリ別（`robointer_vqa/Understanding` 等）で残す |
+| 展開後ディスク | `IVLA_VQA_MAX_GIB=15` 未満（`fetch_vqa_data.sh` が超過時は取得せず失敗）。実測は（PV4 で記入） |
+
+再取得（`$HOME/data` はエフェメラル）:
+
+```bash
+source env_train.sh && source env.vqa.sh      # env.vqa.example.sh を元に作る
+IVLA_VQA_ENABLE=1 bash scripts/provision_data.sh
+```
+
+`fetch_vqa_data.sh` は最初にリポジトリのファイル一覧 + サイズ表を stdout に出し、
+取得予定パターンの合計が `IVLA_VQA_MAX_GIB` を超えるなら 1 バイトも取得せず `exit 1`。
+image zip は `unzip -o` で in-place 展開し、展開後に削除する（`IVLA_VQA_KEEP_ZIP=1` で残す）。
+`raw/.fetch_done` マーカで冪等。
+
+### 9.3 weight と混合
+
+- `--vqa_dataset.weight=0.10`（**本走で使う唯一の値。weight の A/B はしない**）。
+  `env.vqa.sh` で `IVLA_VQA_WEIGHT` を上書きすれば別値でも回せるが計画上は回さない。
+- 混合は上流 `MixedMultimodalDataset([robot_ds, vqa_ds], weights=[1-w, w])` +
+  `MultiMixedWeightedSampler`。`--policy.enable_vqa_loss=true`（ベースラインと同一）で
+  mixed collate 経路に入る。
+- サンプル算（`batch_size=8` / `steps=30000` の実測ベース）:
+
+| `weight` | VQA サンプル / 1000 step | 30k step 合計 | サブセット 40k に対する周回 |
+|---|---|---|---|
+| 0.05 | ~400 | ~12,000 | ~0.30 epoch |
+| **0.10（本走）** | ~800 | ~24,000 | ~0.60 epoch |
+| 0.15 | ~1,200 | ~36,000 | ~0.90 epoch |
+
+- robot 側の実効 draw 数は `w` の分だけ減る（w=0.10 で 240k → 216k robot draws / 30k step）。
+  **比較は step 数を固定**して行い、robot draw 数の差はこの節に記録する（PV5 で記入）。
+
+### 9.4 解像度処理
+
+- VQA 画像も overlay の `RenderDownsampleFn` で **256→128 の 4 カーネル振り分け**
+  （box 0.45 / triangle 0.30 / cubic 0.15 / nearest 0.10、robot と同一確率）を通す。
+  `--vqa_dataset.type=internvla_a1_5_parc` + `--vqa_dataset.render_target=128`。
+- 上流 `_make_vqa_dataset` は VQA transform を hydrate しないので、`RenderDownsampleFn` は
+  `keys` 空 + `auto_detect_keys=True` の経路で `observation.images.image0` 等を拾う。
+  ログに `RenderDownsampleFn was not hydrated; falling back to key auto-detection [...]`
+  が 1 回出るのは**想定挙動**（VQA 経路が生きている signal）。
+- 狙い = 採点環境の native 128 解像度での入力分布に合わせ、言語 grounding を底上げする。
+- **追加拡張（JPEG 劣化・blur 等）は未実施。** 将来の A/B 候補。
+
+### 9.5 比較評価
+
+親計画 `docs/plans/internvla-a15-finetune-plan.md` §5 の評価 pipeline を流用する。
+
+- VQA あり run（`ivla_a15_libero_combined_vqa`）と VQA なし run（`ivla_a15_libero_combined`）を
+  **同一シード（42）・同一 step（30000）・同一 chunking 設定**で track1/2/3 各 N エピソード評価。
+- 成功率 + jerk / SPARC / path length を並べる。チェックポイント選択手順（親計画 D7）も両 run で同一。
+
+| track | 指標 | VQA なし | VQA あり (w=0.10) |
+|---|---|---|---|
+| track1 | 成功率 | （PV5 で記入） | （PV5 で記入） |
+| track1 | jerk / SPARC / path length | （PV5 で記入） | （PV5 で記入） |
+| track2 | 成功率 | （PV5 で記入） | （PV5 で記入） |
+| track2 | jerk / SPARC / path length | （PV5 で記入） | （PV5 で記入） |
+| track3 | 成功率 | （PV5 で記入） | （PV5 で記入） |
+| track3 | jerk / SPARC / path length | （PV5 で記入） | （PV5 で記入） |
+
+提出候補の判断（どちらを出すか）はこの表から説明する（PV5 で記入）。
+
+### 9.6 ライセンス
+
+- `InternRobotics/RoboInter-VQA` の利用条件は HF ページの license 記載を確認する（PV5 で記入）。
+  由来データセット（DROID = CC-BY / RH20T = 各自条件）にも触れる。
+- **非商用・研究利用限定の可能性があるため、提出前に条項を必ず確認する**（PV5 で確認）。
+  VQA データは学習にのみ使用し、提出物には同梱しない。
+- `THIRD_PARTY_LICENSES.md` に RoboInter-VQA を 1 行追記する（PV5 で記入）。

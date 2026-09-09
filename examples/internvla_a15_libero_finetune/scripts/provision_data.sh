@@ -46,4 +46,21 @@ fi
 say "検証"
 IVLA_DIR="$IVLA_DIR" python "$IVLA_DIR/scripts/verify_train_env.py"
 
+# 4/4 VQA データ（任意。IVLA_VQA_ENABLE=1 のときだけ / 計画 §5.4）。
+# 未設定なら echo 1 行のみで既存挙動は完全に不変。RoboInter-VQA は全体 150GB あるので
+# fetch_vqa_data.sh がサブセットだけ取得し、IVLA_VQA_MAX_GIB 超過なら取得せず失敗する。
+if [ "${IVLA_VQA_ENABLE:-0}" = "1" ]; then
+    say "4/4 VQA サブセット（RoboInter-VQA）"
+    bash "$IVLA_DIR/scripts/fetch_vqa_data.sh"
+    python "$IVLA_DIR/scripts/prepare_vqa_data.py" \
+        --src  "${IVLA_VQA_ROOT:-$HOME/data/robointer_vqa}/raw" \
+        --out  "${IVLA_VQA_ROOT:-$HOME/data/robointer_vqa}/lerobot_vqa" \
+        --categories "${IVLA_VQA_CATEGORIES:-Understanding Task_planning}" \
+        --max-samples "${IVLA_VQA_MAX_SAMPLES:-40000}" \
+        --merge-into all.jsonl \
+        --pad-square
+else
+    say "4/4 VQA データはスキップ（IVLA_VQA_ENABLE=1 で有効化）"
+fi
+
 say "完了。学習を開始できる: bash scripts/tmux_train.sh"

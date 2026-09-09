@@ -98,3 +98,6 @@ export IVLA_RENDER_P_NEAREST=0.10
 export WANDB_PROJECT="parc2026-ivla-a15"
 export WANDB_MODE="offline"
 # export WANDB_API_KEY=...
+
+# source の終了コードを 0 に固定する（上の [ -f ] && source が偽だと非ゼロになるため）
+true

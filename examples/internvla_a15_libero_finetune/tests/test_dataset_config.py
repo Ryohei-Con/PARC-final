@@ -4,7 +4,9 @@
 - [x] ``__post_init__`` を 2 回走らせても 1 個のまま（冪等）
 - [x] ``action_mode="abs"`` で ``DeltaActionTransformFn`` が消える
 - [x] draccus で dict 化 -> 復元して等価
-- [x] VQA チェーンでは ``ResizeVQAImagesWithPadFn`` の直前に入る（dead path だが実装はする）
+- [x] VQA チェーンでは ``ResizeVQAImagesWithPadFn`` の直前に入る
+      （``scripts/train_ivla_a15_vqa.sh`` から ``--vqa_dataset.type=internvla_a1_5_parc``
+      で使用。ベースライン ``scripts/train_ivla_a15.sh`` は VQA データを与えない）
 """
 
 from __future__ import annotations
@@ -210,12 +212,12 @@ def test_render_downsample_probabilities_land_in_train_config(config_cls):
 
 
 # --------------------------------------------------------------------------- #
-# VQA（dead path）
+# VQA（VQA ありファインチューニングで使用）
 # --------------------------------------------------------------------------- #
 def test_vqa_render_downsample_is_before_vqa_resize(vqa_config_cls):
-    """現行レシピでは VQA データセットを与えないので **dead path**（計画 D5）。
-
-    それでも実装はしておき、挿入位置だけは単体テストで固定する。
+    """``scripts/train_ivla_a15_vqa.sh`` が ``--vqa_dataset.type=internvla_a1_5_parc``
+    で VQA データを与える。ベースライン ``scripts/train_ivla_a15.sh`` は引き続き
+    VQA データを与えない。挿入位置だけは単体テストで固定する。
     """
     from lerobot.transforms.core import ResizeVQAImagesWithPadFn
     from lerobot_policy_parc.transforms_render import RenderDownsampleFn

@@ -12,10 +12,19 @@
   同じ画像統計になる。逆順や resize の後に置くと 224 -> 128 -> 224 になって
   情報が二重に落ちる。
 
-VQA チェーンについて（計画 §5.1 の注記 / D5）:
-  現行の libero レシピは VQA データセットを与えていないので、
-  ``InternVLAA15ParcVQADatasetConfig`` は **dead path** である。実装はするが、
-  本走では効かない。合成データの単体テストまでが動作確認の範囲。
+VQA チェーンについて（VQA ありファインチューニング / 計画 internvla-a15-vqa-finetune-plan §5.5）:
+  ``InternVLAA15ParcVQADatasetConfig`` は ``scripts/train_ivla_a15_vqa.sh`` から
+  ``--vqa_dataset.type=internvla_a1_5_parc`` で使う。RoboInter-VQA サブセットを
+  ``MixedMultimodalDataset`` で robot データに混ぜる run（``ivla_a15_libero_combined_vqa``）
+  で実際に効く。ベースライン ``scripts/train_ivla_a15.sh`` は依然 VQA データを
+  与えない（``--vqa_dataset.*`` を渡さない）ので、そちらでは引き続き未使用。
+
+  上流 ``_make_vqa_dataset`` は VQA transform を hydrate しない（factory.py:448-458）。
+  そのため ``RenderDownsampleFn`` は ``keys`` 空 + ``auto_detect_keys=True`` の経路で
+  ``observation.images.image0`` 等を検出し、worker ごとに 1 回だけ
+  「not hydrated; falling back to key auto-detection」の warning を出す（想定挙動）。
+  非正方形 VQA 画像のアスペクト比歪みは ``prepare_vqa_data.py --pad-square``（既定 ON、
+  256x256 の正方形化）で防ぐので overlay 側の対応は不要。
 """
 
 from __future__ import annotations
@@ -128,7 +137,13 @@ class InternVLAA15ParcDatasetConfig(InternVLAA15DatasetConfig):
 @VQADatasetConfig.register_subclass("internvla_a1_5_parc")
 @dataclass
 class InternVLAA15ParcVQADatasetConfig(InternVLAA15VQADatasetConfig):
-    """VQA データ用。**現行レシピでは dead path**（計画 §5.1 注記 / D5）。"""
+    """VQA データ用。``scripts/train_ivla_a15_vqa.sh`` から
+    ``--vqa_dataset.type=internvla_a1_5_parc`` で使う（VQA ありファインチューニング）。
+
+    ベースライン ``scripts/train_ivla_a15.sh`` は VQA データを与えないので、そちらでは
+    未使用。``RenderDownsampleFn`` を ``ResizeVQAImagesWithPadFn`` の直前に 1 個だけ
+    挿入する以外は上流 ``InternVLAA15VQADatasetConfig`` と同一。
+    """
 
     render_downsample: bool = True
     render_target: int = 128
